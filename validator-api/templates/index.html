@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IBAN + VAT Validator API</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;500&display=swap" rel="stylesheet">
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#08090a;--surface:#0f1012;--surface2:#161719;--border:#22242a;
+    --text:#d4d8e0;--muted:#4a5060;--accent:#4ade80;--accent2:#60a5fa;
+    --warn:#fbbf24;--danger:#f87171;
+    --mono:'IBM Plex Mono',monospace;--sans:'IBM Plex Sans',sans-serif;
+  }
+  body{background:var(--bg);color:var(--text);font-family:var(--mono);font-size:13px;min-height:100vh}
+
+  header{
+    border-bottom:1px solid var(--border);padding:0 32px;height:52px;
+    display:flex;align-items:center;gap:20px;
+  }
+  .logo{font-family:var(--sans);font-weight:500;font-size:16px;color:var(--text);letter-spacing:-0.3px}
+  .logo em{color:var(--accent);font-style:normal}
+  .tag{font-size:10px;color:var(--muted);border:1px solid var(--border);padding:2px 8px;border-radius:2px;letter-spacing:1px}
+  .live{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted)}
+  .dot{width:6px;height:6px;border-radius:50%;background:var(--accent);animation:blink 2s infinite}
+  @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+
+  .layout{display:grid;grid-template-columns:1fr 1fr;min-height:calc(100vh - 52px)}
+
+  .panel{padding:28px 32px;border-right:1px solid var(--border);display:flex;flex-direction:column;gap:20px}
+  .panel:last-child{border-right:none}
+
+  .panel-title{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);padding-bottom:12px;border-bottom:1px solid var(--border)}
+
+  .tabs{display:flex;gap:0;border:1px solid var(--border);border-radius:4px;overflow:hidden;width:fit-content}
+  .tab{padding:6px 16px;font-family:var(--mono);font-size:11px;cursor:pointer;background:transparent;border:none;color:var(--muted);transition:all .15s}
+  .tab.active{background:var(--surface2);color:var(--text)}
+  .tab:hover:not(.active){color:var(--text)}
+
+  label{display:block;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+
+  input,textarea{
+    width:100%;background:var(--surface2);border:1px solid var(--border);
+    color:var(--text);font-family:var(--mono);font-size:13px;
+    padding:10px 12px;border-radius:4px;outline:none;transition:border-color .15s;
+  }
+  input:focus,textarea:focus{border-color:var(--accent)}
+  textarea{min-height:100px;resize:vertical;line-height:1.6}
+
+  .examples{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+  .ex{font-size:11px;padding:3px 10px;border:1px solid var(--border);border-radius:3px;cursor:pointer;color:var(--muted);background:transparent;font-family:var(--mono);transition:all .15s}
+  .ex:hover{border-color:var(--accent2);color:var(--accent2)}
+
+  button.primary{
+    width:100%;padding:10px;background:var(--accent);color:#08090a;
+    border:none;border-radius:4px;font-family:var(--mono);font-size:12px;
+    font-weight:500;cursor:pointer;letter-spacing:.5px;transition:opacity .15s;
+  }
+  button.primary:hover{opacity:.85}
+  button.primary:disabled{opacity:.3;cursor:not-allowed}
+
+  .result{
+    background:var(--surface);border:1px solid var(--border);border-radius:4px;
+    padding:16px;display:none;flex-direction:column;gap:12px;
+  }
+
+  .result.valid{border-color:rgba(74,222,128,.25)}
+  .result.invalid{border-color:rgba(248,113,113,.25)}
+
+  .result-status{
+    display:flex;align-items:center;gap:8px;font-size:12px;font-weight:500;
+  }
+  .result-status.ok{color:var(--accent)}
+  .result-status.fail{color:var(--danger)}
+
+  .result-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+  .result-row{display:flex;flex-direction:column;gap:3px;padding:8px;background:var(--surface2);border-radius:3px}
+  .result-key{font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase}
+  .result-val{font-size:12px;color:var(--text);word-break:break-all}
+
+  .formatted{
+    font-size:18px;font-weight:500;letter-spacing:2px;
+    color:var(--accent);padding:12px;background:var(--surface2);
+    border-radius:3px;text-align:center;word-break:break-all;
+  }
+
+  .error-msg{
+    background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.2);
+    border-radius:3px;padding:10px 12px;color:var(--danger);font-size:12px;line-height:1.6;
+  }
+
+  .docs{display:flex;flex-direction:column;gap:16px}
+  .endpoint{background:var(--surface);border:1px solid var(--border);border-radius:4px;overflow:hidden}
+  .endpoint-header{padding:10px 14px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border)}
+  .method{font-size:10px;font-weight:500;padding:2px 8px;border-radius:2px;background:rgba(96,165,250,.15);color:var(--accent2);letter-spacing:.5px}
+  .path{font-size:12px;color:var(--text)}
+  .endpoint-body{padding:14px;font-size:11px;color:var(--muted);line-height:1.8}
+  .code{background:var(--surface2);border:1px solid var(--border);border-radius:3px;padding:10px 12px;font-size:11px;color:var(--text);line-height:1.8;white-space:pre;overflow-x:auto;margin-top:8px}
+
+  .rapidapi-box{
+    background:linear-gradient(135deg,rgba(74,222,128,.05),rgba(96,165,250,.05));
+    border:1px solid var(--border);border-radius:4px;padding:16px;
+    display:flex;flex-direction:column;gap:8px;
+  }
+  .rapidapi-title{font-size:12px;font-weight:500;color:var(--text)}
+  .rapidapi-steps{display:flex;flex-direction:column;gap:6px}
+  .step{font-size:11px;color:var(--muted);display:flex;gap:8px;line-height:1.6}
+  .step-num{color:var(--accent);flex-shrink:0;font-weight:500}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo"><em>IBAN</em> + VAT Validator</div>
+  <div class="tag">API v1.0</div>
+  <div class="live"><div class="dot"></div>live</div>
+</header>
+
+<div class="layout">
+
+  <!-- LEFT: TESTER -->
+  <div class="panel">
+    <div class="panel-title">Test the API</div>
+
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('iban')">IBAN</button>
+      <button class="tab" onclick="switchTab('vat')">VAT</button>
+      <button class="tab" onclick="switchTab('batch')">Batch</button>
+    </div>
+
+    <!-- IBAN -->
+    <div id="tab-iban">
+      <label>IBAN Number</label>
+      <input type="text" id="ibanInput" placeholder="GB82 WEST 1234 5698 7654 32" />
+      <div class="examples">
+        <span>Examples:</span>
+        <button class="ex" onclick="setIban('GB82WEST12345698765432')">GB (valid)</button>
+        <button class="ex" onclick="setIban('DE89370400440532013000')">DE (valid)</button>
+        <button class="ex" onclick="setIban('NL91ABNA0417164300')">NL (valid)</button>
+        <button class="ex" onclick="setIban('FR7630006000011234567890189')">FR (valid)</button>
+        <button class="ex" onclick="setIban('GB00WEST12345698765432')">invalid</button>
+      </div>
+      <br>
+      <button class="primary" id="ibanBtn" onclick="testIban()">Validate IBAN →</button>
+      <br>
+      <div class="result" id="ibanResult"></div>
+    </div>
+
+    <!-- VAT -->
+    <div id="tab-vat" style="display:none">
+      <label>VAT Number</label>
+      <input type="text" id="vatInput" placeholder="DE123456789" />
+      <div class="examples">
+        <span>Examples:</span>
+        <button class="ex" onclick="setVat('DE123456789')">DE (valid)</button>
+        <button class="ex" onclick="setVat('GB123456789')">GB (valid)</button>
+        <button class="ex" onclick="setVat('NL123456789B01')">NL (valid)</button>
+        <button class="ex" onclick="setVat('FRAA123456789')">FR (valid)</button>
+        <button class="ex" onclick="setVat('DE12345')">invalid</button>
+      </div>
+      <br>
+      <button class="primary" id="vatBtn" onclick="testVat()">Validate VAT →</button>
+      <br>
+      <div class="result" id="vatResult"></div>
+    </div>
+
+    <!-- BATCH -->
+    <div id="tab-batch" style="display:none">
+      <label>IBANs (one per line)</label>
+      <textarea id="batchIbans" placeholder="GB82WEST12345698765432&#10;DE89370400440532013000&#10;NL91ABNA0417164300"></textarea>
+      <br>
+      <label>VATs (one per line)</label>
+      <textarea id="batchVats" placeholder="DE123456789&#10;GB123456789"></textarea>
+      <br>
+      <button class="primary" id="batchBtn" onclick="testBatch()">Validate Batch →</button>
+      <br>
+      <div class="result" id="batchResult"></div>
+    </div>
+  </div>
+
+  <!-- RIGHT: DOCS + RAPIDAPI -->
+  <div class="panel">
+    <div class="panel-title">Endpoints</div>
+
+    <div class="docs">
+      <div class="endpoint">
+        <div class="endpoint-header">
+          <span class="method">POST</span>
+          <span class="path">/validate/iban</span>
+        </div>
+        <div class="endpoint-body">
+          Validates any IBAN. Returns country, formatted version, check digits, BBAN. Supports 77 countries.
+          <div class="code">{ "iban": "GB82WEST12345698765432" }</div>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-header">
+          <span class="method">POST</span>
+          <span class="path">/validate/vat</span>
+        </div>
+        <div class="endpoint-body">
+          Validates EU VAT numbers. Returns country and normalized format. Covers all 27 EU states + UK.
+          <div class="code">{ "vat": "DE123456789" }</div>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-header">
+          <span class="method">POST</span>
+          <span class="path">/validate/batch</span>
+        </div>
+        <div class="endpoint-body">
+          Validate up to 100 IBANs and/or VATs in a single request. Returns per-item results + summary.
+          <div class="code">{ "ibans": ["GB82...", "DE89..."], "vats": ["DE123..."] }</div>
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <div class="endpoint-header">
+          <span class="method">GET</span>
+          <span class="path">/countries</span>
+        </div>
+        <div class="endpoint-body">Lists all supported countries with expected formats and lengths.</div>
+      </div>
+    </div>
+
+    <div class="rapidapi-box">
+      <div class="rapidapi-title">How to earn money from this</div>
+      <div class="rapidapi-steps">
+        <div class="step"><span class="step-num">1.</span>Push this folder to a GitHub repo</div>
+        <div class="step"><span class="step-num">2.</span>Deploy free on render.com — connect GitHub, done in 3 min</div>
+        <div class="step"><span class="step-num">3.</span>Go to rapidapi.com/provider → Add New API</div>
+        <div class="step"><span class="step-num">4.</span>Set your Render URL as the base URL</div>
+        <div class="step"><span class="step-num">5.</span>Add endpoints, set pricing (e.g. free 100 calls/mo, then $0.001/call)</div>
+        <div class="step"><span class="step-num">6.</span>RapidAPI handles all billing — you collect monthly</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+function switchTab(tab) {
+  ['iban','vat','batch'].forEach(t => {
+    document.getElementById('tab-' + t).style.display = t === tab ? 'block' : 'none';
+  });
+  document.querySelectorAll('.tab').forEach((el, i) => {
+    el.classList.toggle('active', ['iban','vat','batch'][i] === tab);
+  });
+}
+
+function setIban(v) { document.getElementById('ibanInput').value = v; }
+function setVat(v)  { document.getElementById('vatInput').value = v; }
+
+function showResult(id, data, type) {
+  const el = document.getElementById(id);
+  el.style.display = 'flex';
+  el.className = 'result ' + (data.valid ? 'valid' : 'invalid');
+
+  if (type === 'iban' && data.valid) {
+    el.innerHTML = `
+      <div class="result-status ok">✓ Valid IBAN</div>
+      <div class="formatted">${data.formatted}</div>
+      <div class="result-grid">
+        <div class="result-row"><div class="result-key">Country</div><div class="result-val">${data.country} (${data.country_code})</div></div>
+        <div class="result-row"><div class="result-key">Check Digits</div><div class="result-val">${data.check_digits}</div></div>
+        <div class="result-row"><div class="result-key">BBAN</div><div class="result-val">${data.bban}</div></div>
+        <div class="result-row"><div class="result-key">Length</div><div class="result-val">${data.length} characters</div></div>
+      </div>`;
+  } else if (type === 'vat' && data.valid) {
+    el.innerHTML = `
+      <div class="result-status ok">✓ Valid VAT Number</div>
+      <div class="formatted">${data.vat_number}</div>
+      <div class="result-grid">
+        <div class="result-row"><div class="result-key">Country</div><div class="result-val">${data.country} (${data.country_code})</div></div>
+        <div class="result-row"><div class="result-key">Normalized</div><div class="result-val">${data.normalized}</div></div>
+      </div>`;
+  } else if (type === 'batch') {
+    const s = data.summary;
+    el.innerHTML = `
+      <div class="result-status ok">Batch Complete</div>
+      <div class="result-grid">
+        <div class="result-row"><div class="result-key">IBANs Valid</div><div class="result-val" style="color:var(--accent)">${s.ibans_valid}</div></div>
+        <div class="result-row"><div class="result-key">IBANs Invalid</div><div class="result-val" style="color:var(--danger)">${s.ibans_invalid}</div></div>
+        <div class="result-row"><div class="result-key">VATs Valid</div><div class="result-val" style="color:var(--accent)">${s.vats_valid}</div></div>
+        <div class="result-row"><div class="result-key">VATs Invalid</div><div class="result-val" style="color:var(--danger)">${s.vats_invalid}</div></div>
+      </div>
+      <div class="code">${JSON.stringify({iban_results: data.iban_results, vat_results: data.vat_results}, null, 2)}</div>`;
+  } else {
+    el.innerHTML = `
+      <div class="result-status fail">✗ Invalid</div>
+      <div class="error-msg">${data.error || 'Validation failed'}</div>
+      ${data.expected_format ? `<div class="result-row"><div class="result-key">Expected format</div><div class="result-val">${data.expected_format}</div></div>` : ''}`;
+  }
+}
+
+async function testIban() {
+  const val = document.getElementById('ibanInput').value.trim();
+  if (!val) return;
+  const btn = document.getElementById('ibanBtn');
+  btn.disabled = true; btn.textContent = 'Validating...';
+  try {
+    const r = await fetch('/validate/iban', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({iban: val})});
+    const d = await r.json();
+    showResult('ibanResult', d, 'iban');
+  } finally { btn.disabled = false; btn.textContent = 'Validate IBAN →'; }
+}
+
+async function testVat() {
+  const val = document.getElementById('vatInput').value.trim();
+  if (!val) return;
+  const btn = document.getElementById('vatBtn');
+  btn.disabled = true; btn.textContent = 'Validating...';
+  try {
+    const r = await fetch('/validate/vat', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({vat: val})});
+    const d = await r.json();
+    showResult('vatResult', d, 'vat');
+  } finally { btn.disabled = false; btn.textContent = 'Validate VAT →'; }
+}
+
+async function testBatch() {
+  const ibans = document.getElementById('batchIbans').value.trim().split('\n').filter(Boolean);
+  const vats  = document.getElementById('batchVats').value.trim().split('\n').filter(Boolean);
+  if (!ibans.length && !vats.length) return;
+  const btn = document.getElementById('batchBtn');
+  btn.disabled = true; btn.textContent = 'Validating...';
+  try {
+    const r = await fetch('/validate/batch', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ibans, vats})});
+    const d = await r.json();
+    showResult('batchResult', d, 'batch');
+  } finally { btn.disabled = false; btn.textContent = 'Validate Batch →'; }
+}
+
+document.getElementById('ibanInput').addEventListener('keydown', e => { if (e.key === 'Enter') testIban(); });
+document.getElementById('vatInput').addEventListener('keydown',  e => { if (e.key === 'Enter') testVat(); });
+</script>
+</body>
+</html>
